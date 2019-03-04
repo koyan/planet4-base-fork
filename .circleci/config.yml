@@ -49,53 +49,92 @@ jobs:
             - var
             - src
 
-  test-codeception:
-    <<: *defaults
-    steps:
-      - setup_remote_docker:
-          docker_layer_caching: true
+  # This is defunct as new docker-compose version doesn't run tests in `make ci`
+  # test-codeception:
+  #   <<: *defaults
+  #   steps:
+  #     - setup_remote_docker:
+  #         docker_layer_caching: true
+  #
+  #     - attach_workspace:
+  #         at: /tmp/workspace
+  #
+  #     - run:
+  #         name: Clone planet4-docker-compose
+  #         command: |
+  #           git clone https://github.com/greenpeace/planet4-docker-compose
+  #
+  #     - run:
+  #         name: Run tests
+  #         command: |
+  #           export BUILD_TAG="build-$(cat /tmp/workspace/var/circle-build-num)"
+  #           export APP_IMAGE=gcr.io/planet-4-151612/planet4-base-app:${BUILD_TAG}
+  #           export OPENRESTY_IMAGE=gcr.io/planet-4-151612/planet4-base-openresty:${BUILD_TAG}
+  #
+  #           pushd planet4-docker-compose
+  #           make ci
+  #           popd
+  #
+  #     - run:
+  #         name: Extract test artifacts
+  #         when: always
+  #         command: |
+  #           export BUILD_TAG="build-$(cat /tmp/workspace/var/circle-build-num)"
+  #           export APP_IMAGE=gcr.io/planet-4-151612/planet4-base-app:${BUILD_TAG}
+  #           export OPENRESTY_IMAGE=gcr.io/planet-4-151612/planet4-base-openresty:${BUILD_TAG}
+  #
+  #           pushd planet4-docker-compose
+  #           make ci-extract-artifacts
+  #           popd
+  #
+  #     - persist_to_workspace:
+  #         root: /tmp/workspace
+  #         paths:
+  #           - var
+  #
+  #     - store_test_results:
+  #         path: /tmp/artifacts
+  #
+  #     - store_artifacts:
+  #         path: /tmp/artifacts
 
+  test-codeception:
+    docker:
+      - image: gcr.io/planet-4-151612/circleci-base:latest
+    working_directory: /home/circleci/app
+    steps:
       - attach_workspace:
           at: /tmp/workspace
-
+      - restore_cache:
+          keys:
+            - content-v1-{{ .Branch }}-{{ .Revision }}-{{ .BuildNum }}
+            - content-v1-{{ .Branch }}-{{ .Revision }}
+            - content-v1-{{ .Branch }}
+            - content-v1
+      - setup_remote_docker:
+          docker_layer_caching: true
+      - run: git clone https://github.com/greenpeace/planet4-docker-compose
       - run:
-          name: Clone planet4-docker-compose
+          name: Build CI containers
           command: |
-            git clone https://github.com/greenpeace/planet4-docker-compose
-
-      - run:
-          name: Run tests
-          command: |
-            export BUILD_TAG="build-$(cat /tmp/workspace/var/circle-build-num)"
-            export APP_IMAGE=gcr.io/planet-4-151612/planet4-base-app:${BUILD_TAG}
-            export OPENRESTY_IMAGE=gcr.io/planet-4-151612/planet4-base-openresty:${BUILD_TAG}
-
-            pushd planet4-docker-compose
-            make ci
-            popd
-
-      - run:
-          name: Extract test artifacts
-          when: always
-          command: |
-            export BUILD_TAG="build-$(cat /tmp/workspace/var/circle-build-num)"
-            export APP_IMAGE=gcr.io/planet-4-151612/planet4-base-app:${BUILD_TAG}
-            export OPENRESTY_IMAGE=gcr.io/planet-4-151612/planet4-base-openresty:${BUILD_TAG}
-
-            pushd planet4-docker-compose
-            make ci-extract-artifacts
-            popd
-
-      - persist_to_workspace:
-          root: /tmp/workspace
+              export BUILD_TAG="build-$(cat /tmp/workspace/var/circle-build-num)"
+              export APP_IMAGE=gcr.io/planet-4-151612/planet4-base-app:${BUILD_TAG}
+              export OPENRESTY_IMAGE=gcr.io/planet-4-151612/planet4-base-openresty:${BUILD_TAG}
+              make ci
+      - save_cache:
+          key: content-v1-{{ .Branch }}-{{ .Revision }}-{{ .BuildNum }}
           paths:
-            - var
-
+            - defaultcontent
+      - run: make test
+      - run: make ci-extract-artifacts
       - store_test_results:
-          path: /tmp/artifacts
-
+          path: artifacts
       - store_artifacts:
-          path: /tmp/artifacts
+          path: artifacts
+      - run:
+          name: Notify failure
+          when: on_fail
+          command: TYPE="Codeception" notify-job-failure.sh
 
   build-and-test-codeception:
     <<: *defaults
