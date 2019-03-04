@@ -101,7 +101,7 @@ jobs:
   test-codeception:
     docker:
       - image: gcr.io/planet-4-151612/circleci-base:latest
-    working_directory: /home/circleci/app
+    working_directory: /home/circleci/docker-compose
     steps:
       - attach_workspace:
           at: /tmp/workspace
@@ -113,7 +113,7 @@ jobs:
             - content-v1
       - setup_remote_docker:
           docker_layer_caching: true
-      - run: git clone https://github.com/greenpeace/planet4-docker-compose
+      - run: git clone https://github.com/greenpeace/planet4-docker-compose .
       - run:
           name: Build CI containers
           command: |
